@@ -163,8 +163,9 @@ def scrape_release(link):
     '''
 
     print(f"begin to retrieve:{link}")
-    pm = urllib3.PoolManager()
-    html = pm.urlopen(url = link, method = "GET").data
+    #pm = urllib3.PoolManager()
+    #html = pm.urlopen(url = link, method = "GET").data
+    html = requests.get(link).content
     soup = bs4.BeautifulSoup(html, 'lxml')
 
     if soup.find_all('p', class_ = "article__time"):
