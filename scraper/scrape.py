@@ -9,6 +9,7 @@ import queue
 import json
 import sys
 import csv
+import ssl
 
 FED_HOME_PAGE = "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
 FED_HISTORICAL_PAGE = "https://www.federalreserve.gov/monetarypolicy/fomc_historical_year.htm"
@@ -147,72 +148,81 @@ def get_hist_links(link = FED_HISTORICAL_PAGE, min_year = 1994, max_year = 2013)
 
 
 def scrape_release(link):
-	'''
-	Takes the URL to an individual press release 
-	and an ongoing lists of the dates and texts, 
-	scrapes the release date and text from that link's
-	press release, and appends that information to the appropriate lists.
+    '''
+    Takes the URL to an individual press release 
+    and an ongoing lists of the dates and texts, 
+    scrapes the release date and text from that link's
+    press release, and appends that information to the appropriate lists.
 
-	Inputs:
-		link: string of the URL to scrape
-	
-	Outputs:
-		date: string of release date
-		ptxt: string of release text
-	'''
+    Inputs:
+        link: string of the URL to scrape
+    
+    Outputs:
+        date: string of release date
+        ptxt: string of release text
+    '''
 
-	pm = urllib3.PoolManager()
-	html = pm.urlopen(url = link, method = "GET").data
-	soup = bs4.BeautifulSoup(html, 'lxml')
+    print(f"begin to retrieve:{link}")
+    pm = urllib3.PoolManager()
+    html = pm.urlopen(url = link, method = "GET").data
+    soup = bs4.BeautifulSoup(html, 'lxml')
 
-	if soup.find_all('p', class_ = "article__time"):
+    if soup.find_all('p', class_ = "article__time"):
 
-		date = soup.find_all('p', class_ = "article__time")[0].text
+        date = soup.find_all('p', class_ = "article__time")[0].text
 
-		ptxt = ''
-		text_divtag = soup.find_all('div', class_ = "col-xs-12 col-sm-8 col-md-8")[0]
-		text_ptags = text_divtag.find_all('p')
-		for ptag in text_ptags:
-			if not ptag.find_all('a'):
-				if not re.findall("Voting for the FOMC monetary policy action ",ptag.text): 
-					ptxt += ptag.text
-					ptxt = ptxt.strip()
-					ptxt = ptxt.replace("\n", "")
-					ptxt = ptxt.replace('\r', "")
+        ptxt = ''
+        text_divtag = soup.find_all('div', class_ = "col-xs-12 col-sm-8 col-md-8")[0]
+        text_ptags = text_divtag.find_all('p')
+        for ptag in text_ptags:
+            if not ptag.find_all('a'):
+                if not re.findall("Voting for the FOMC monetary policy action ",ptag.text): 
+                    ptxt += ptag.text
+                    ptxt = ptxt.strip()
+                    ptxt = ptxt.replace("\n", "")
+                    ptxt = ptxt.replace('\r', "")
 
 
-	else:
-		date = soup.find_all('title')[0].text
-		date = re.findall(r'(\w+\s\d+,\s\d+)', date)[0]
-		p = soup.find_all('p')
-		ptxt =''
-		for t in p:
-			ptxt += t.text
-			ptxt = ptxt.strip()
-		ptxt = ptxt.replace("\n", "")
-		ptxt = ptxt.replace('\r', "")
-		ptxt = ptxt.replace("\xa0", "")
-	
-	return date, ptxt
+    else:
+        date = soup.find_all('title')[0].text
+        date = re.findall(r'(\w+\s\d+,\s\d+)', date)[0]
+        p = soup.find_all('p')
+        ptxt =''
+        for t in p:
+            ptxt += t.text
+            ptxt = ptxt.strip()
+        ptxt = ptxt.replace("\n", "")
+        ptxt = ptxt.replace('\r', "")
+        ptxt = ptxt.replace("\xa0", "")
+    
+    return date, ptxt
 
 
 
 
 
 if __name__ == "__main__":
-	links = []
-	links += get_hist_links()
-	links += post2013_calendar_scraper()
+    try:
+        _create_unverified_https_context = ssl._create_unverified_context
+    except AttributeError:
+        # Legacy Python that doesn't verify HTTPS certificates by default
+        pass
+    else:
+        # Handle target environment that doesn't support HTTPS verification
+        ssl._create_default_https_context = _create_unverified_https_context
+    links = []
+    links += get_hist_links()
+    links += post2013_calendar_scraper()
 
-	dates = []
-	texts = []
-	for l in links:
-		ldate, ltxt = scrape_release(l)
-		dates.append(ldate)
-		texts.append(ltxt)
+    dates = []
+    texts = []
+    for l in links:
+        ldate, ltxt = scrape_release(l)
+        dates.append(ldate)
+        texts.append(ltxt)
 
-	df = pd.DataFrame({'date': dates, 'release_text':texts})
-	df.to_csv('scrapeddata.csv')
+    df = pd.DataFrame({'date': dates, 'release_text':texts})
+    df.to_csv('scrapeddata.csv')
 
 
 
